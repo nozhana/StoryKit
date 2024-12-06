@@ -5,7 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "SwiftyStories",
-    platforms: [.iOS(.v14)],
+    platforms: [.iOS(.v16)],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
@@ -16,7 +16,7 @@ let package = Package(
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
-            name: "SwiftyStories"),
+            name: "SwiftyStories", resources: [.process("Resources")]),
 
     ]
 )
