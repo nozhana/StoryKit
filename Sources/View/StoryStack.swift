@@ -7,51 +7,51 @@
 
 import SwiftUI
 
-struct StoryStack: View {
-    @EnvironmentObject private var storyModel: StoryViewModel
+public struct StoryStack: View {
+    var bundles: [StoryBundleData]
+    @Binding var currentBundle: StoryBundleData
+    @Binding var show: Bool
     
-    var body: some View {
+    public init(bundles: [StoryBundleData], currentBundle: Binding<StoryBundleData>, show: Binding<Bool>) {
+        self.bundles = bundles
+        self._currentBundle = currentBundle
+        self._show = show
+    }
+    
+    public var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack {
-                ForEach(storyModel.bundles) { bundle in
-                    Image(bundle.profileImage, bundle: .module)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 50, height: 50)
-                        .clipShape(.circle)
-                        .padding(3)
-                        .background {
-                            if !bundle.isSeen {
-                                Circle()
-                                    .stroke(lineWidth: 2)
-                                    .foregroundStyle(.linearGradient(colors: bundle.isCloseFriend
-                                                                     ? [.green, .teal]
-                                                                     : [.red, .orange, .red, .orange],
-                                                                     startPoint: .bottomLeading,
-                                                                     endPoint: .topTrailing))
+                ForEach(bundles) { bundle in
+                    Button {
+                        currentBundle = bundle
+                        show = true
+                    } label: {
+                        bundle.profileView
+                            .frame(width: 50, height: 50)
+                            .clipShape(.circle)
+                            .padding(3)
+                            .background {
+                                if !bundle.isSeen {
+                                    Circle()
+                                        .stroke(lineWidth: 2)
+                                        .foregroundStyle(
+                                            .linearGradient(
+                                                colors: bundle.isCloseFriend
+                                                ? [.green, .teal]
+                                                : [.red, .orange, .red, .orange],
+                                                startPoint: .bottomLeading,
+                                                endPoint: .topTrailing
+                                            )
+                                        )
+                                }
                             }
-                        }
-                        .asButton {
-                            storyModel.currentBundle = bundle
-                            storyModel.showStory.toggle()
-                        }
-                        .fullScreenCover(isPresented: $storyModel.showStory, content: Story.init)
+                    } // Button/label
+                    .fullScreenCover(isPresented: $show) {
+                        Story(bundles: bundles, currentBundle: $currentBundle)
+                    }
                 } // ForEach
             } // LazyHStack
             .padding()
         } // ScrollView
-    }
-}
-
-#Preview {
-    StoryStackPreviews()
-}
-
-private struct StoryStackPreviews: View {
-    @StateObject private var storyModel = StoryViewModel.preview
-    
-    var body: some View {
-        StoryStack()
-            .environmentObject(storyModel)
     }
 }
