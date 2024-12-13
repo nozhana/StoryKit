@@ -8,12 +8,12 @@
 import SwiftUI
 
 public struct StoryStack: View {
-    var bundles: [StoryBundleData]
+    @Binding var bundles: [StoryBundleData]
     @Binding var currentBundle: StoryBundleData
     @Binding var show: Bool
     
-    public init(bundles: [StoryBundleData], currentBundle: Binding<StoryBundleData>, show: Binding<Bool>) {
-        self.bundles = bundles
+    public init(bundles: Binding<[StoryBundleData]>, currentBundle: Binding<StoryBundleData>, show: Binding<Bool>) {
+        self._bundles = bundles
         self._currentBundle = currentBundle
         self._show = show
     }
@@ -47,7 +47,7 @@ public struct StoryStack: View {
                             }
                     } // Button/label
                     .fullScreenCover(isPresented: $show) {
-                        Story(bundles: bundles, currentBundle: $currentBundle)
+                        Story(bundles: $bundles, currentBundle: $currentBundle)
                     }
                 } // ForEach
             } // LazyHStack

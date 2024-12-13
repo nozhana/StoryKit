@@ -8,7 +8,7 @@
 import SwiftUI
 
 public struct Story: View {
-    var bundles: [StoryBundleData]
+    @Binding var bundles: [StoryBundleData]
     @Binding var currentBundle: StoryBundleData
     
     @State private var isPressed = false
@@ -16,8 +16,8 @@ public struct Story: View {
     @State private var progress: CGFloat = 0
     @Environment(\.dismiss) private var dismiss
     
-    public init(bundles: [StoryBundleData], currentBundle: Binding<StoryBundleData>) {
-        self.bundles = bundles
+    public init(bundles: Binding<[StoryBundleData]>, currentBundle: Binding<StoryBundleData>) {
+        self._bundles = bundles
         self._currentBundle = currentBundle
     }
     
@@ -86,8 +86,10 @@ public struct Story: View {
         .transition(.move(edge: .bottom))
         .offset(y: yOffset)
         .gesture(combinedGesture)
-        .onChange(of: currentBundle) { _ in
+        .onChange(of: currentBundle) { bundle in
             progress = 0
+            guard let index = bundles.firstIndex(of: bundle) else { return }
+            bundles[index].isSeen = true
         }
         .onReceive(timer) { _ in
             if Int(progress) < currentBundle.stories.count, !isPressed {
@@ -111,5 +113,9 @@ public struct Story: View {
                 }
             }
         } // onReceive
+        .onAppear {
+            guard let index = bundles.firstIndex(of: currentBundle) else { return }
+            bundles[index].isSeen = true
+        }
     }
 }
