@@ -11,6 +11,8 @@ public struct Story: View {
     var bundles: [StoryBundleData]
     @Binding var currentBundle: StoryBundleData
     
+    @State private var isPressed = false
+    @State private var yOffset: CGFloat = 0
     @State private var progress: CGFloat = 0
     @Environment(\.dismiss) private var dismiss
     
@@ -19,9 +21,6 @@ public struct Story: View {
         self._currentBundle = currentBundle
     }
     
-    @State private var yOffset: CGFloat = 0
-    @State private var isPressed = false
-    
     private let timer = Timer.publish(every: 0.05, tolerance: 0.01, on: .main, in: .common).autoconnect()
     
     private var currentStoryIndex: Int {
@@ -29,6 +28,29 @@ public struct Story: View {
     }
     
     public var body: some View {
+        let tapGesture = SpatialTapGesture()
+            .onEnded { value in
+                progress = CGFloat(min(max(0, currentStoryIndex + (value.location.x > 100 ? 1 : -1)), currentBundle.stories.count))
+            }
+        
+        let dragGesture = DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                yOffset = value.translation.height
+                isPressed = true
+            }
+            .onEnded { value in
+                if value.translation.height > 250 {
+                    dismiss()
+                    return
+                }
+                withAnimation {
+                    yOffset = 0
+                    isPressed = false
+                }
+            }
+        
+        let combinedGesture = tapGesture.exclusively(before: dragGesture)
+        
         ZStack(alignment: .topTrailing) {
             if bundles.isEmpty || currentBundle.isEmpty {
                 VStack {
@@ -47,18 +69,7 @@ public struct Story: View {
                             .tag(bundle)
                     } // ForEach
                 } // TabView
-                .onTapGesture { point in
-                    progress = CGFloat(max(0, currentStoryIndex + (point.x > 100 ? 1 : -1)))
-                }
-                .onLongPressGesture {} onPressingChanged: { pressed in
-                    isPressed = pressed
-                }
-                .onChange(of: currentBundle) { _ in
-                    progress = 0
-                }
                 .tabViewStyle(.page(indexDisplayMode: .never))
-                .transition(.move(edge: .bottom))
-                .offset(y: yOffset)
             }
             
             Button {
@@ -72,21 +83,12 @@ public struct Story: View {
             } // Button/label
             .padding(.top, 16)
         } // ZStack
-        .gesture(
-            DragGesture()
-                .onChanged { value in
-                    yOffset = value.translation.height
-                }
-                .onEnded { value in
-                    withAnimation(.easeOut(duration: 0.5)) {
-                        yOffset = 0
-                    }
-                    
-                    if value.translation.height > 250 {
-                        dismiss()
-                    }
-                }
-        ) // gesture
+        .transition(.move(edge: .bottom))
+        .offset(y: yOffset)
+        .gesture(combinedGesture)
+        .onChange(of: currentBundle) { _ in
+            progress = 0
+        }
         .onReceive(timer) { _ in
             if Int(progress) < currentBundle.stories.count, !isPressed {
                 progress += 0.01
@@ -95,7 +97,7 @@ public struct Story: View {
                 let story = currentBundle.stories[index]
 
                 if let lastStory = currentBundle.stories.last,
-                   lastStory.id == story.id {
+                   lastStory.id == story.id, !isPressed {
                     
                     if let lastBundle = bundles.last,
                        currentBundle.id == lastBundle.id {
