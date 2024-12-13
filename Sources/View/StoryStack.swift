@@ -46,6 +46,7 @@ public struct StoryStack: View {
                                 }
                             }
                     } // Button/label
+                    .buttonStyle(.storyStack)
                     .fullScreenCover(isPresented: $show) {
                         Story(bundles: $bundles, currentBundle: $currentBundle)
                     }
