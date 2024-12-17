@@ -32,7 +32,7 @@ public struct StoryEditor: View {
                         model.imageState = .empty
                     }
                     model.locationUnit = .center
-                    Haptic.shared.generate(.impact(style: .rigid))
+                    Haptic.shared.generate(.warning())
                 }
             }
         
@@ -62,7 +62,6 @@ public struct StoryEditor: View {
         
         ZStack {
             Color.black
-                .clipShape(.rect(cornerRadius: 12))
             
             Group {
                     Rectangle()
@@ -216,7 +215,7 @@ public struct StoryEditor: View {
                 .scaleEffect(model.isInDeleteArea ? 1 : 0.1)
                 .show(if: model.isInDeleteArea)
                 .animation(.easeOut(duration: 0.25), value: model.isInDeleteArea)
-                .haptic(.warning(), trigger: model.isInDeleteArea, onlyTrue: true)
+                .haptic(.impact(style: .heavy, intensity: 0.9), trigger: model.isInDeleteArea, onlyTrue: true)
                 .offset(y: 240)
             
             Image(systemName: "xmark")
@@ -249,6 +248,7 @@ public struct StoryEditor: View {
             .padding()
             .frame(maxHeight: .infinity, alignment: .bottom)
         } // ZStack
+        .clipShape(.rect(cornerRadius: 12))
     }
 }
 
@@ -434,7 +434,7 @@ private extension StoryEditor {
         }
         
         var isInDeleteArea: Bool {
-            locationUnit.x.between(lhs: 0.45, rhs: 0.55) && locationUnit.y.between(lhs: 0.9, rhs: 1)
+            locationUnit.x.between(lhs: 0.45, rhs: 0.55) && locationUnit.y > 0.9
         }
         
         @MainActor func renderImage() -> UIImage? {

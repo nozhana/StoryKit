@@ -73,8 +73,10 @@ public struct StoryStack: View {
                             let newStory = StoryData(label: Image(uiImage: image))
                             if let myBundleIndex = bundles.firstIndex(where: { $0.profileName == myProfileName }) {
                                 bundles[myBundleIndex].stories.append(newStory)
+                                bundles[myBundleIndex].isSeen = false
                             } else {
-                                bundles.append(StoryBundleData(profileName: myProfileName, profileView: myProfileImage, stories: [newStory]))
+                                let bundle = StoryBundleData(profileName: myProfileName, profileView: myProfileImage, stories: [newStory])
+                                bundles.insert(bundle, at: 0)
                             }
                         }
                     }

@@ -22,7 +22,6 @@ public struct StoryBundle: View {
         GeometryReader { geometry in
             ZStack(alignment: .topLeading) {
                 Color.black
-                    .clipShape(.rect(cornerRadius: 8))
                 
                 let index = min(Int(progress), bundle.stories.count - 1)
                 let story = bundle.stories[index]
@@ -67,6 +66,7 @@ public struct StoryBundle: View {
                 .opacity(isPressed ? 0 : 1)
                 .animation(.easeOut(duration: 0.5), value: isPressed)
             } // ZStack
+            .clipShape(.rect(cornerRadius: 12))
             .rotation3DEffect(rotationAngle(in: geometry),
                               axis: (x: 0, y: 1, z: 0),
                               anchor: geometry.frame(in: .global).minX > 0 ? .leading : .trailing,
