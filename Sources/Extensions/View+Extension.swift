@@ -14,39 +14,23 @@ extension View {
     
     func haptic<T: Equatable>(_ feedback: HapticFeedback, trigger: T) -> some View {
         onChange(of: trigger) { _ in
-            feedback.generate()
+            Haptic.shared.generate(feedback)
         }
     }
     
     func haptic<T: Equatable>(trigger: T, feedback: @escaping (_ value: T) -> HapticFeedback?) -> some View {
         onChange(of: trigger) { value in
-            feedback(value)?.generate()
+            if let feedback = feedback(value) {
+                Haptic.shared.generate(feedback)
+            }
         }
     }
-}
-
-enum HapticFeedback {
-    case impact(style: UIImpactFeedbackGenerator.FeedbackStyle? = nil, intensity: CGFloat? = nil)
-    case selection
     
-    func generate() {
-        switch self {
-        case .impact(let style, let intensity):
-            let haptic: UIImpactFeedbackGenerator
-            if let style {
-                haptic = UIImpactFeedbackGenerator(style: style)
-            } else {
-                haptic = UIImpactFeedbackGenerator()
+    func haptic(_ feedback: HapticFeedback, trigger: Bool, onlyTrue: Bool = false) -> some View {
+        onChange(of: trigger) { value in
+            if !onlyTrue || (onlyTrue && value) {
+                Haptic.shared.generate(feedback)
             }
-            
-            if let intensity {
-                haptic.impactOccurred(intensity: intensity)
-            } else {
-                haptic.impactOccurred()
-            }
-        case .selection:
-            let haptic = UISelectionFeedbackGenerator()
-            haptic.selectionChanged()
         }
     }
 }

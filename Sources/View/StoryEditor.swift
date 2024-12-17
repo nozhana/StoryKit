@@ -20,40 +20,42 @@ public struct StoryEditor: View {
     public var body: some View {
         let dragGesture = DragGesture()
             .onChanged { value in
-                model.isDragging = true
+                model.isDraggingSlowly = value.velocity < .init(width: 50, height: 50)
                 let unit = value.location.unit(in: model.canvasSize)
-                model.locationUnit.x = unit.x.snapped(to: model.unitXSnaps, tolerance: 0.03)
-                model.locationUnit.y = unit.y.snapped(to: model.unitYSnaps, tolerance: 0.03)
+                model.locationUnit.x = unit.x.snapped(to: model.unitXSnaps, tolerance: 0.02)
+                model.locationUnit.y = unit.y.snapped(to: model.unitYSnaps, tolerance: 0.02)
             }
             .onEnded { _ in
-                model.isDragging = false
+                model.isDraggingSlowly = false
                 if model.isInDeleteArea {
                     withAnimation {
                         model.imageState = .empty
                     }
                     model.locationUnit = .center
-                    HapticFeedback.impact(style: .rigid).generate()
+                    Haptic.shared.generate(.impact(style: .rigid))
                 }
             }
         
         let magnifyGesture = MagnificationGesture()
             .onChanged { value in
-                model.scale = (model.lastScale * value).snapped(to: [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5], tolerance: 0.1)
+                model.scale = (model.lastScale * value)
+                    .snapped(to: model.scaleSnaps, tolerance: 0.1)
+                    .clamped(to: 0.25...5)
             }
             .onEnded { value in
-                model.lastScale *= value
+                model.lastScale = (model.lastScale * value)
+                    .snapped(to: model.scaleSnaps, tolerance: 0.1)
+                    .clamped(to: 0.25...5)
             }
         
         let rotationGesture = RotationGesture()
             .onChanged { angle in
                 model.rotation = (model.lastRotation + angle.degrees)
-                    .snapped(to: (0...8)
-                        .map { Double($0) * 45 }
-                        .flatMap { [$0, -$0] },
-                             tolerance: 5)
+                    .snapped(to: model.rotationSnaps, tolerance: 5)
             }
             .onEnded { angle in
-                model.lastRotation += angle.degrees
+                model.lastRotation = (model.lastRotation + angle.degrees)
+                    .snapped(to: model.rotationSnaps, tolerance: 5)
             }
         
         let combinedGesture = dragGesture.simultaneously(with: rotationGesture).simultaneously(with: magnifyGesture)
@@ -63,49 +65,52 @@ public struct StoryEditor: View {
                 .clipShape(.rect(cornerRadius: 12))
             
             Group {
-                Group {
                     Rectangle()
                         .frame(maxWidth: 1, maxHeight: .infinity)
-                        .show(if: model.snappedToVerticalCenter)
+                        .opacity(model.verticalCenterGuideOpacity)
+                        .foregroundStyle(model.snappedToVerticalCenter ? .blue : .white)
                         .animation(.easeOut, value: model.snappedToVerticalCenter)
+                        .haptic(.selection, trigger: model.snappedToVerticalCenter, onlyTrue: true)
                     
                     Rectangle()
                         .frame(maxWidth: 1, maxHeight: .infinity)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .show(if: model.snappedToLeading)
+                        .opacity(model.leadingGuideOpacity)
+                        .foregroundStyle(model.snappedToLeading ? .blue : .white)
                         .animation(.easeOut, value: model.snappedToLeading)
+                        .haptic(.selection, trigger: model.snappedToLeading, onlyTrue: true)
                     
                     Rectangle()
                         .frame(maxWidth: 1, maxHeight: .infinity)
                         .frame(maxWidth: .infinity, alignment: .trailing)
-                        .show(if: model.snappedToTrailing)
+                        .opacity(model.trailingGuideOpacity)
+                        .foregroundStyle(model.snappedToTrailing ? .blue : .white)
                         .animation(.easeOut, value: model.snappedToTrailing)
-                } // Group
-                .foregroundStyle(.linearGradient(colors: [.blue, .teal], startPoint: .top, endPoint: .bottom))
+                        .haptic(.selection, trigger: model.snappedToTrailing, onlyTrue: true)
                 
-                Group {
                     Rectangle()
                         .frame(maxWidth: .infinity, maxHeight: 1)
-                        .show(if: model.snappedToHorizontalCenter)
+                        .opacity(model.horizontalCenterGuideOpacity)
+                        .foregroundStyle(model.snappedToHorizontalCenter ? .blue : .white)
                         .animation(.easeOut, value: model.snappedToHorizontalCenter)
+                        .haptic(.selection, trigger: model.snappedToHorizontalCenter, onlyTrue: true)
                     
                     Rectangle()
                         .frame(maxWidth: .infinity, maxHeight: 1)
                         .frame(maxHeight: .infinity, alignment: .top)
-                        .show(if: model.snappedToTop)
+                        .opacity(model.topGuideOpacity)
+                        .foregroundStyle(model.snappedToTop ? .blue : .white)
                         .animation(.easeOut, value: model.snappedToTop)
+                        .haptic(.selection, trigger: model.snappedToTop, onlyTrue: true)
                     
                     Rectangle()
                         .frame(maxWidth: .infinity, maxHeight: 1)
                         .frame(maxHeight: .infinity, alignment: .bottom)
-                        .show(if: model.snappedToBottom)
+                        .opacity(model.bottomGuideOpacity)
+                        .foregroundStyle(model.snappedToBottom ? .blue : .white)
                         .animation(.easeOut, value: model.snappedToBottom)
-                } // Group
-                .foregroundStyle(.linearGradient(colors: [.blue, .teal], startPoint: .leading, endPoint: .trailing))
+                        .haptic(.selection, trigger: model.snappedToBottom, onlyTrue: true)
             } // Group
-            .haptic(trigger: model.snapped) { value in
-                value ? .selection : nil
-            }
             
             Group {
                 switch model.imageState {
@@ -133,7 +138,9 @@ public struct StoryEditor: View {
                             .animation(.easeOut(duration: 0.25), value: model.isInDeleteArea)
                             .transition(.scale)
                             .rotationEffect(.degrees(model.rotation))
+                            .haptic(.selection, trigger: model.snappedRotation, onlyTrue: true)
                             .scaleEffect(model.scale)
+                            .haptic(.selection, trigger: model.snappedScale, onlyTrue: true)
                             .position(model.location)
                             .gesture(combinedGesture)
                             .onAppear {
@@ -149,13 +156,36 @@ public struct StoryEditor: View {
             if model.imageState.isLoaded {
                 VStack {
                     Button {
-                        model.isSnapping.toggle()
+                        model.isSnappingLocation.toggle()
                     } label: {
-                        Image(systemName: model.isSnapping ? "bolt.circle.fill" : "bolt.circle")
+                        Image(systemName: model.isSnappingLocation ? "pin.circle.fill" : "pin.circle")
                             .resizable()
-                            .foregroundStyle(model.isSnapping ? .yellow : .white)
+                            .scaledToFit()
                             .frame(width: 24, height: 24)
                             .padding(8)
+                            .foregroundStyle(model.isSnappingLocation ? .yellow : .white)
+                    } // Button/label
+                    
+                    Button {
+                        model.isSnappingScale.toggle()
+                    } label: {
+                        Image(systemName: model.isSnappingScale ? "arrowshape.left.arrowshape.right.fill" : "arrowshape.left.arrowshape.right")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 24, height: 24)
+                            .padding(8)
+                            .foregroundStyle(model.isSnappingScale ? .yellow : .white)
+                    } // Button/label
+                    
+                    Button {
+                        model.isSnappingRotation.toggle()
+                    } label: {
+                        Image(systemName: model.isSnappingRotation ? "arrow.clockwise.circle.fill" : "arrow.clockwise.circle")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 24, height: 24)
+                            .padding(8)
+                            .foregroundStyle(model.isSnappingRotation ? .yellow : .white)
                     } // Button/label
                     
                     Button {
@@ -163,9 +193,10 @@ public struct StoryEditor: View {
                     } label: {
                         Image(systemName: model.controlsSide == .trailing ? "align.horizontal.right.fill" : "align.horizontal.left.fill")
                             .resizable()
-                            .foregroundStyle(.white)
+                            .scaledToFit()
                             .frame(width: 24, height: 24)
                             .padding(8)
+                            .foregroundStyle(.white)
                     } // Button/label
                 } // VStack
                 .padding(8)
@@ -185,6 +216,7 @@ public struct StoryEditor: View {
                 .scaleEffect(model.isInDeleteArea ? 1 : 0.1)
                 .show(if: model.isInDeleteArea)
                 .animation(.easeOut(duration: 0.25), value: model.isInDeleteArea)
+                .haptic(.warning(), trigger: model.isInDeleteArea, onlyTrue: true)
                 .offset(y: 240)
             
             Image(systemName: "xmark")
@@ -266,8 +298,10 @@ private extension StoryEditor {
         }
         
         @Published var controlsSide: ControlsSide = .trailing
-        @Published var isSnapping = true
-        @Published var isDragging = false
+        @Published var isSnappingLocation = true
+        @Published var isSnappingRotation = true
+        @Published var isSnappingScale = true
+        @Published var isDraggingSlowly = false
         @Published var imageRatio: CGFloat = 1
         @Published var canvasSize: CGSize = .zero
         @Published var locationUnit: UnitPoint = .center
@@ -285,7 +319,7 @@ private extension StoryEditor {
         }
         
         var unitXSnaps: [CGFloat] {
-            guard isSnapping else { return [] }
+            guard isSnappingLocation, isDraggingSlowly else { return [] }
             let imageDragBounds = canvasSize - imageSize
             let imageDragUnit = imageDragBounds / canvasSize
             return [
@@ -296,7 +330,7 @@ private extension StoryEditor {
         }
         
         var unitYSnaps: [CGFloat] {
-            guard isSnapping else { return [] }
+            guard isSnappingLocation, isDraggingSlowly else { return [] }
             let imageDragBounds = canvasSize - imageSize
             let imageDragUnit = imageDragBounds / canvasSize
             return [
@@ -307,31 +341,96 @@ private extension StoryEditor {
         }
         
         var snappedToVerticalCenter: Bool {
-            locationUnit.x == 0.5 && isDragging
+            locationUnit.x == 0.5 && isDraggingSlowly && isSnappingLocation
+        }
+        
+        var verticalCenterGuideOpacity: CGFloat {
+            guard isDraggingSlowly, isSnappingLocation else { return 0 }
+            let distance = abs(locationUnit.x - 0.5)
+            let step = simd_smoothstep(0, 0.2, distance)
+            return 1 - step
         }
         
         var snappedToLeading: Bool {
-            locationUnit.x == unitXSnaps.first && isDragging
+            locationUnit.x == unitXSnaps.first && isDraggingSlowly && isSnappingLocation
+        }
+        
+        var leadingGuideOpacity: CGFloat {
+            guard isDraggingSlowly, isSnappingLocation,
+                  let leadingSnap = unitXSnaps.first else { return 0 }
+            let distance = abs(locationUnit.x - leadingSnap)
+            let step = simd_smoothstep(0, 0.2, distance)
+            return 1 - step
         }
         
         var snappedToTrailing: Bool {
-            locationUnit.x == unitXSnaps.last && isDragging
+            locationUnit.x == unitXSnaps.last && isDraggingSlowly && isSnappingLocation
+        }
+        
+        var trailingGuideOpacity: CGFloat {
+            guard isDraggingSlowly, isSnappingLocation,
+                  let trailingSnap = unitXSnaps.last else { return 0 }
+            let distance = abs(locationUnit.x - trailingSnap)
+            let step = simd_smoothstep(0, 0.2, distance)
+            return 1 - step
         }
         
         var snappedToHorizontalCenter: Bool {
-            locationUnit.y == 0.5 && isDragging
+            locationUnit.y == 0.5 && isDraggingSlowly && isSnappingLocation
+        }
+        
+        var horizontalCenterGuideOpacity: CGFloat {
+            guard isDraggingSlowly, isSnappingLocation else { return 0 }
+            let distance = abs(locationUnit.y - 0.5)
+            let step = simd_smoothstep(0, 0.2, distance)
+            return 1 - step
         }
         
         var snappedToTop: Bool {
-            locationUnit.y == unitYSnaps.first && isDragging
+            locationUnit.y == unitYSnaps.first && isDraggingSlowly && isSnappingLocation
+        }
+        
+        var topGuideOpacity: CGFloat {
+            guard isDraggingSlowly, isSnappingLocation,
+                  let topSnap = unitYSnaps.first else { return 0 }
+            let distance = abs(locationUnit.y - topSnap)
+            let step = simd_smoothstep(0, 0.2, distance)
+            return 1 - step
         }
         
         var snappedToBottom: Bool {
-            locationUnit.y == unitYSnaps.last && isDragging
+            locationUnit.y == unitYSnaps.last && isDraggingSlowly && isSnappingLocation
         }
         
-        var snapped: Bool {
-            snappedToVerticalCenter || snappedToLeading || snappedToTrailing || snappedToHorizontalCenter || snappedToTop || snappedToBottom
+        var bottomGuideOpacity: CGFloat {
+            guard isDraggingSlowly, isSnappingLocation,
+                  let bottomSnap = unitYSnaps.last else { return 0 }
+            let distance = abs(locationUnit.y - bottomSnap)
+            let step = simd_smoothstep(0, 0.2, distance)
+            return 1 - step
+        }
+        
+        var rotationSnaps: [CGFloat] {
+            guard isSnappingRotation else { return [] }
+            return (0...8)
+                .flatMap { [$0, -$0] }
+                .map { CGFloat($0) * 45 }
+        }
+        
+        var snappedRotation: Bool {
+            guard isSnappingRotation else { return false }
+            return rotationSnaps.contains(rotation)
+        }
+        
+        var scaleSnaps: [CGFloat] {
+            guard isSnappingScale else { return [] }
+            return (1...6)
+                .map { CGFloat($0) * 0.5 }
+        }
+        
+        var snappedScale: Bool {
+            guard isSnappingScale else { return false }
+            return scaleSnaps.contains(scale)
         }
         
         var isInDeleteArea: Bool {
