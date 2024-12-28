@@ -20,21 +20,33 @@ public struct StoryEditor: View {
     public var body: some View {
         let dragGesture = DragGesture()
             .onChanged { value in
+                model.touchLocationUnit = UnitPoint(x: value.location.x / model.canvasSize.width, y: value.location.y / model.canvasSize.height).clamped(to: .topLeading...(.bottomTrailing))
                 model.isDragging = true
                 model.isDraggingSlowly = value.velocity < .init(width: 20, height: 20)
-                let unit = value.location.unit(in: model.canvasSize)
-                model.locationUnit.x = unit.x.snapped(to: model.unitXSnaps, tolerance: 0.02)
-                model.locationUnit.y = unit.y.snapped(to: model.unitYSnaps, tolerance: 0.02)
+                let offset = value.translation
+                let canvas = model.canvasSize
+                let offsetUnit = (offset / canvas).toUnitPoint().clamped(to: UnitPoint(x: -1, y: -1)...(.bottomTrailing))
+                let locationUnit = model.lastLocationUnit + offsetUnit
+                
+                model.locationUnit.x = locationUnit.x.snapped(to: model.unitXSnaps, tolerance: 0.02)
+                model.locationUnit.y = locationUnit.y.snapped(to: model.unitYSnaps, tolerance: 0.02)
             }
             .onEnded { _ in
                 model.isDragging = false
                 model.isDraggingSlowly = false
+                model.lastLocationUnit = model.locationUnit
                 if model.isInDeleteArea {
                     withAnimation {
                         model.imageState = .empty
                     }
                     model.locationUnit = .center
-                    Haptic.shared.generate(.rollAway())
+                    model.lastLocationUnit = .center
+                    model.touchLocationUnit = .center
+                    model.rotation = .zero
+                    model.lastRotation = .zero
+                    model.scale = 0.8
+                    model.lastScale = 0.8
+                    Haptic.shared.play(.rollAway())
                 }
             }
         
@@ -306,15 +318,16 @@ private extension StoryEditor {
         @Published var isDraggingSlowly = false
         @Published var imageRatio: CGFloat = 1
         @Published var canvasSize: CGSize = .zero
-        @Published var renderSize: CGSize = .zero
         @Published var locationUnit: UnitPoint = .center
+        @Published var lastLocationUnit: UnitPoint = .center
+        @Published var touchLocationUnit: UnitPoint = .center
         @Published var lastScale: CGFloat = 0.8
         @Published var scale: CGFloat = 0.8
         @Published var lastRotation: CGFloat = .zero
         @Published var rotation: CGFloat = .zero
         
         var location: CGPoint {
-            canvasSize * locationUnit
+            canvasSize * (isInDeleteArea ? touchLocationUnit : locationUnit)
         }
         
         var imageSize: CGSize {
@@ -436,7 +449,7 @@ private extension StoryEditor {
         }
         
         var isInDeleteArea: Bool {
-            locationUnit.x.between(lhs: 0.45, rhs: 0.55) && locationUnit.y > 0.85
+            touchLocationUnit.x.between(lhs: 0.38, rhs: 0.62) && touchLocationUnit.y.between(lhs: 0.75, rhs: 0.90)
         }
         
         @MainActor func renderImage() -> UIImage? {

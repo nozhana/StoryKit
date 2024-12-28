@@ -42,7 +42,7 @@ final class Haptic: Logging {
         }
     }
     
-    // MARK: - Private
+    // MARK: - Engine
     private func engineDidStop(withReason reason: CHHapticEngine.StoppedReason) {
         logError("reason: \(reason)")
     }
@@ -50,6 +50,61 @@ final class Haptic: Logging {
     private func engineDidRecoverFromServerError() {
         logWarning("Engine reset.")
         prepare()
+    }
+    
+    // MARK: Engine(Public)
+    func prepare() {
+        do {
+            try engine?.start()
+        } catch {
+            logError("Failed to start haptic engine: \(error.localizedDescription)")
+        }
+    }
+    
+    func stopEngine() {
+        engine?.stop { [weak self] error in
+            guard let self, let error else { return }
+            logWarning("Failed to stop haptic engine: \(error.localizedDescription)")
+        }
+    }
+    
+    // MARK: - Haptics
+    private func playImpactHaptic(style: UIImpactFeedbackGenerator.FeedbackStyle? = nil, intensity: CGFloat? = nil) {
+        let generator: UIImpactFeedbackGenerator
+        if let style {
+            generator = .init(style: style)
+        } else {
+            generator = .init()
+        }
+        
+        if let intensity {
+            generator.impactOccurred(intensity: intensity)
+        } else {
+            generator.impactOccurred()
+        }
+    }
+    
+    private func playSelectionHaptic() {
+        let generator = UISelectionFeedbackGenerator()
+        generator.selectionChanged()
+    }
+    
+    private func playAlignmentHaptic(magnitude: Double) {
+        guard let engine else { return }
+        try? engine.start()
+        
+        let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: Float(magnitude))
+        let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 1)
+        let attack = CHHapticEventParameter(parameterID: .attackTime, value: 0.4)
+        let event = CHHapticEvent(eventType: .hapticTransient, parameters: [intensity, sharpness, attack], relativeTime: 0)
+        
+        do {
+            let pattern = try CHHapticPattern(events: [event], parameters: [])
+            self.player = try engine.makePlayer(with: pattern)
+            try player!.start(atTime: CHHapticTimeImmediate)
+        } catch {
+            logError("Failed to play alignment haptic: \(error.localizedDescription)")
+        }
     }
     
     private func playWarningHaptic(magnitude: Double, duration: TimeInterval) {
@@ -72,24 +127,6 @@ final class Haptic: Logging {
             try player!.start(atTime: CHHapticTimeImmediate)
         } catch {
             logError("Failed to play warning haptic: \(error.localizedDescription)")
-        }
-    }
-    
-    private func playAlignmentHaptic(magnitude: Double) {
-        guard let engine else { return }
-        try? engine.start()
-        
-        let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: Float(magnitude))
-        let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 1)
-        let attack = CHHapticEventParameter(parameterID: .attackTime, value: 0.4)
-        let event = CHHapticEvent(eventType: .hapticTransient, parameters: [intensity, sharpness, attack], relativeTime: 0)
-        
-        do {
-            let pattern = try CHHapticPattern(events: [event], parameters: [])
-            self.player = try engine.makePlayer(with: pattern)
-            try player!.start(atTime: CHHapticTimeImmediate)
-        } catch {
-            logError("Failed to play alignment haptic: \(error.localizedDescription)")
         }
     }
     
@@ -120,46 +157,38 @@ final class Haptic: Logging {
         }
     }
     
-    // MARK: - Public
-    func prepare() {
+    private func playLevelChangeHaptic(level: Double) {
+        guard let engine else { return }
+        try? engine.start()
+        
+        let parameterValue = level.clamped(to: 0...1) * 0.7 + 0.2
+        let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: Float(parameterValue))
+        let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: Float(parameterValue))
+        let event = CHHapticEvent(eventType: .hapticTransient, parameters: [intensity, sharpness], relativeTime: 0)
+        
         do {
-            try engine?.start()
+            let pattern = try CHHapticPattern(events: [event], parameters: [])
+            self.player = try engine.makePlayer(with: pattern)
+            try player!.start(atTime: CHHapticTimeImmediate)
         } catch {
-            logError("Failed to start haptic engine: \(error.localizedDescription)")
+            logError("Failed to play level change haptic: \(error.localizedDescription)")
         }
     }
     
-    func stopEngine() {
-        engine?.stop { [weak self] error in
-            guard let self, let error else { return }
-            logWarning("Failed to stop haptic engine: \(error.localizedDescription)")
-        }
-    }
-    
-    func generate(_ feedback: Feedback) {
+    func play(_ feedback: Feedback) {
         switch feedback {
         case .impact(let style, let intensity):
-            let generator: UIImpactFeedbackGenerator
-            if let style {
-                generator = .init(style: style)
-            } else {
-                generator = .init()
-            }
-            
-            if let intensity {
-                generator.impactOccurred(intensity: intensity)
-            } else {
-                generator.impactOccurred()
-            }
+            playImpactHaptic(style: style, intensity: intensity)
         case .selection:
-            let generator = UISelectionFeedbackGenerator()
-            generator.selectionChanged()
+            playSelectionHaptic()
         case .alignment(let magnitude):
             playAlignmentHaptic(magnitude: magnitude)
         case .warning(let magnitude, let duration):
             playWarningHaptic(magnitude: magnitude, duration: duration)
         case .rollAway(let magnitude, let duration):
             playRollAwayHaptic(magnitude: magnitude, duration: duration)
+        case .levelChange(let level):
+            playLevelChangeHaptic(level: level)
         }
     }
 }
@@ -171,5 +200,6 @@ extension Haptic {
         case alignment(magnitude: Double = 0.75)
         case warning(magnitude: Double = 1, duration: TimeInterval = 1)
         case rollAway(magnitude: Double = 1, duration: TimeInterval = 1.5)
+        case levelChange(level: Double = 0.5)
     }
 }

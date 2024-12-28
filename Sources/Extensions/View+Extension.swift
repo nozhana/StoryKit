@@ -14,14 +14,14 @@ extension View {
     
     func haptic<T: Equatable>(_ feedback: Haptic.Feedback, trigger: T) -> some View {
         onChange(of: trigger) { _ in
-            Haptic.shared.generate(feedback)
+            Haptic.shared.play(feedback)
         }
     }
     
     func haptic<T: Equatable>(trigger: T, feedback: @escaping (_ value: T) -> Haptic.Feedback?) -> some View {
         onChange(of: trigger) { value in
             if let feedback = feedback(value) {
-                Haptic.shared.generate(feedback)
+                Haptic.shared.play(feedback)
             }
         }
     }
@@ -29,7 +29,7 @@ extension View {
     func haptic<T: Equatable>(_ feedback: Haptic.Feedback, trigger: T, condition: @escaping (T) -> Bool) -> some View {
         onChange(of: trigger) { value in
             if condition(value) {
-                Haptic.shared.generate(feedback)
+                Haptic.shared.play(feedback)
             }
         }
     }

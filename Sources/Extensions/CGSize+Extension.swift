@@ -73,3 +73,9 @@ extension CGSize {
         CGSize(width: abs(width), height: abs(height))
     }
 }
+
+extension CGSize {
+    func toUnitPoint() -> UnitPoint {
+        UnitPoint(x: width, y: height)
+    }
+}
